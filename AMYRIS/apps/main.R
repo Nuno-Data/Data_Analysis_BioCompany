@@ -102,14 +102,129 @@ best_df <- function(DF,threshold =0, max_number_per_plate=nrow(DF), Robots=c('Be
     dplyr::group_by(plate) %>% 
     dplyr::filter(value > max(value[well_type=='Parent Strain'])+ threshold) %>% 
     dplyr::slice(1:max_number_per_plate)
+  }
+
+dd <-as.data.frame(best_df(new_df))
+
+to_plot <- rbind(dd,new_df %>% dplyr::filter((well_type =='Parent Strain')), by='Plate') %>% 
+  dplyr::mutate(
+    value = as.numeric(value),
+    plate =as.numeric(plate)
+  )
+
+to_plot <- na.omit(to_plot)
+
+
+
+#starts
+
+# First, let's create some sample data
+df <- dd
+
+
+####plot i wanna use.
+
+###perfect####
+to_plot$plate <- factor(to_plot$plate, levels = rep(as.character(seq(1, 60))))
+new_df$plate <- factor(new_df$plate, levels = rep(as.character(seq(1, 60))))
+new_df <- na.omit(new_df)
+
+new_df <- new_df %>%
+  mutate(color = case_when(
+    as.numeric(plate) < 21 ~ "red",
+    as.numeric(plate) >20 & as.numeric(plate) <41  ~ "blue",
+    as.numeric(plate)>40  ~ "green"
+  ))
+
+
+###only the best
+to_plot <- to_plot %>%
+  mutate(color = case_when(
+    as.numeric(plate) < 21 ~ "red",
+    as.numeric(plate) >20 & as.numeric(plate) <41  ~ "blue",
+    as.numeric(plate)>40  ~ "green"
+  ))
+
+myplot <- ggplot(to_plot, aes(x =(to_plot$plate), y = value, color = well_type)) + 
+  geom_boxplot() ########working
+
+myplot_ALLL <- ggplot(new_df, aes(x =plate, y = value, color = well_type)) + 
+  geom_boxplot() + scale_fill_manual(values = c("red", "blue", "green")) 
+
+
+myplot_lostcoumt2 <- ggplot(to_plot %>% dplyr::filter(well_type=='Standard Well')
+, aes(x =plate, y = value)) + 
+  geom_boxplot(aes(colour = color))
+
+##########perfect
+########working
+#buttom com filtro
+#evocar funcao
+
+
+
+# Now, let's create a UI that includes three buttons for each group
+library(shiny)
+
+ui <- fluidPage(
+  titlePanel("My Plot"),
+  sidebarLayout(
+    sidebarPanel(
+      #   selectInput("plate", "Select a plate to delet outplier:", choices = unique(to_plot$plate)),
+      #   actionButton("removeoutliers", "Remove Outliers"),
+      checkboxGroupInput("group", "Select groups:", choices = unique(to_plot$robot), selected = unique(to_plot$robot))
+    ),
+    mainPanel(
+     
+      plotOutput("myplot_ALLL"),
+      plotOutput("myplot"),
+      plotOutput("myplot_ALthebest")
+    )
+  )
+)
+
+# Now, let's create a server function that filters the data based on the button clicks
+
+server <- function(input, output) {
+  
+ 
+ # observeEvent(input$plate, {
+  #   # Get the input value
+  #  my_value <- input$plate
+  #  # Call the function with the input value as an argument
+  #  removeOutliersIQR(to_plot %>% dplyr::filter(plate==my_value), 1)
+    
+  #})
+ 
+  # Create a plot that displays the filtered data
+  
+  output$myplot_ALLL <- renderPlot({
+    filtered_df_all <- new_df[new_df$robot %in% input$group,]
+    ggplot( filtered_df_all, aes(x = plate, y = value, color = well_type)) + 
+      geom_boxplot() +
+      labs(title = "All the data from CSV")
+  })
+  
+  
+  output$myplot <- renderPlot({
+    filtered_df <- to_plot[to_plot$robot %in% input$group,]
+    ggplot(filtered_df, aes(x = plate, y = value, color = well_type)) + 
+      geom_boxplot()+
+      labs(title = "Data only from the Standard Well's that surpass their father's values")
+  })
+  
+  output$myplot_ALthebest <- renderPlot({
+    filtered_df_best <- to_plot[to_plot$robot %in% input$group,] %>% dplyr::filter(well_type=='Standard Well')
+    ggplot(filtered_df_best, aes(x = plate, y = value, color=robot)) + 
+      geom_boxplot()+
+      labs(title = "Best Standard Well's compared to their parent's")
+  })
+  
+  
 }
 
-dd <- best_df(new_df,Robots = 'C3P0')
+shinyApp(ui, server)
 
-
-    
-    
-    
 
 
 removeOutliersIQR <- function(dfData, limitRemove = 3, strongOutliers = T){
@@ -161,4 +276,7 @@ removeOutliersIQR <- function(dfData, limitRemove = 3, strongOutliers = T){
   
 }
 
-#new_df3 %>% dplyr::filter(t.test(new_variable)$p.value< 1.5) %>% View()
+
+
+
+
