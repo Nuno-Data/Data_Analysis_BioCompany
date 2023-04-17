@@ -9,3 +9,4 @@ Key points of the project included:
 - Statistical summary for each plate with outputs in CSV and JSON formats.
 - A function to generate improved strains based on the parent and various variables such as which "robot" was used to measure it, how many strains to retrieve, and the threshold for improvement over the parent.
 - Use of the interquartile range to detect and remove outliers.
+- Use shinyApp to show visualizations/plots that are interactive.
