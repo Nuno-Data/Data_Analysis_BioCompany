@@ -81,80 +81,53 @@ statistical_summary <- function(DF){
   return(statistics_df)
 }
 
-new_df <- Validate_files(path)  
-if(is.data.frame(new_df)==FALSE){
+Validated_df <- Validate_files(path)  
+if(is.data.frame(Validated_df)==FALSE){
   print('Validations: Failed. Data is corrupted. Another file is required')
 }else{
   print('file has been validated and is able to proceed')
-  summary <- statistical_summary(new_df)
-  write.csv(summary, 'data/summary.csv')
+  summary <- statistical_summary(Validated_df)
+  #write.csv(summary, 'data/summary.csv')
   
   Jsummary <- toJSON(summary)
-  write(Jsummary, "data/JSON_summary.json")
+  #write(Jsummary, "data/JSON_summary.json")
 }
 
 
 
 best_df <- function(DF,threshold =0, max_number_per_plate=nrow(DF), Robots=c('Bender','Terminator','C3P0')) {
   
-  ist_maybe12122 <- DF %>%
+  bestDF <- DF %>%
     dplyr::filter(robot==Robots) %>% #######working
     dplyr::group_by(plate) %>% 
     dplyr::filter(value > max(value[well_type=='Parent Strain'])+ threshold) %>% 
     dplyr::slice(1:max_number_per_plate)
   }
 
-dd <-as.data.frame(best_df(new_df))
+Final_df <-as.data.frame(best_df(Validated_df))
 
-to_plot <- rbind(dd,new_df %>% dplyr::filter((well_type =='Parent Strain')), by='Plate') %>% 
+to_plot_DF <- rbind(Final_df,Validated_df %>% dplyr::filter((well_type =='Parent Strain')), by='Plate') %>% 
   dplyr::mutate(
     value = as.numeric(value),
     plate =as.numeric(plate)
   )
 
-to_plot <- na.omit(to_plot)
-
-
-
-#starts
-
-# First, let's create some sample data
-df <- dd
+to_plot_df <- na.omit(to_plot_DF)
 
 
 ####plot i wanna use.
 
-###perfect####
-to_plot$plate <- factor(to_plot$plate, levels = rep(as.character(seq(1, 60))))
-new_df$plate <- factor(new_df$plate, levels = rep(as.character(seq(1, 60))))
-new_df <- na.omit(new_df)
+to_plot_df$plate <- factor(to_plot_df$plate, levels = rep(as.character(seq(1, 60))))
+Validated_df$plate <- factor(Validated_df$plate, levels = rep(as.character(seq(1, 60))))
+Validated_df <- na.omit(Validated_df)
+Validated_df <- as.data.frame(Validated_df)
 
-new_df <- new_df %>%
-  mutate(color = case_when(
-    as.numeric(plate) < 21 ~ "red",
-    as.numeric(plate) >20 & as.numeric(plate) <41  ~ "blue",
-    as.numeric(plate)>40  ~ "green"
-  ))
-
-
-###only the best
-to_plot <- to_plot %>%
-  mutate(color = case_when(
-    as.numeric(plate) < 21 ~ "red",
-    as.numeric(plate) >20 & as.numeric(plate) <41  ~ "blue",
-    as.numeric(plate)>40  ~ "green"
-  ))
-
-myplot <- ggplot(to_plot, aes(x =(to_plot$plate), y = value, color = well_type)) + 
+myplot <- ggplot(to_plot_df, aes(x =plate, y = value, color = well_type)) + 
   geom_boxplot() ########working
 
-myplot_ALLL <- ggplot(new_df, aes(x =plate, y = value, color = well_type)) + 
-  geom_boxplot() + scale_fill_manual(values = c("red", "blue", "green")) 
+myplot_OG <- ggplot(Validated_df, aes(x =plate, y = value, color = well_type)) + 
+  geom_boxplot() 
 
-
-myplot_lostcoumt2 <- ggplot(to_plot %>% dplyr::filter(well_type=='Standard Well')
-, aes(x =plate, y = value)) + 
-  geom_boxplot(aes(colour = color))
 
 ##########perfect
 ########working
@@ -172,11 +145,11 @@ ui <- fluidPage(
     sidebarPanel(
       #   selectInput("plate", "Select a plate to delet outplier:", choices = unique(to_plot$plate)),
       #   actionButton("removeoutliers", "Remove Outliers"),
-      checkboxGroupInput("group", "Select groups:", choices = unique(to_plot$robot), selected = unique(to_plot$robot))
+      checkboxGroupInput("group", "Select groups:", choices = unique(to_plot_df$robot), selected = unique(to_plot_df$robot))
     ),
     mainPanel(
      
-      plotOutput("myplot_ALLL"),
+      plotOutput("myplot_OG"),
       plotOutput("myplot"),
       plotOutput("myplot_ALthebest")
     )
@@ -187,19 +160,10 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   
- 
- # observeEvent(input$plate, {
-  #   # Get the input value
-  #  my_value <- input$plate
-  #  # Call the function with the input value as an argument
-  #  removeOutliersIQR(to_plot %>% dplyr::filter(plate==my_value), 1)
-    
-  #})
- 
-  # Create a plot that displays the filtered data
+
   
-  output$myplot_ALLL <- renderPlot({
-    filtered_df_all <- new_df[new_df$robot %in% input$group,]
+  output$myplot_OG <- renderPlot({
+    filtered_df_all <- Validated_df[Validated_df$robot %in% input$group,]
     ggplot( filtered_df_all, aes(x = plate, y = value, color = well_type)) + 
       geom_boxplot() +
       labs(title = "All the data from CSV")
@@ -207,14 +171,14 @@ server <- function(input, output) {
   
   
   output$myplot <- renderPlot({
-    filtered_df <- to_plot[to_plot$robot %in% input$group,]
+    filtered_df <- to_plot_df[to_plot_df$robot %in% input$group,]
     ggplot(filtered_df, aes(x = plate, y = value, color = well_type)) + 
       geom_boxplot()+
       labs(title = "Data only from the Standard Well's that surpass their father's values")
   })
   
   output$myplot_ALthebest <- renderPlot({
-    filtered_df_best <- to_plot[to_plot$robot %in% input$group,] %>% dplyr::filter(well_type=='Standard Well')
+    filtered_df_best <- to_plot_df[to_plot_df$robot %in% input$group,] %>% dplyr::filter(well_type=='Standard Well')
     ggplot(filtered_df_best, aes(x = plate, y = value, color=robot)) + 
       geom_boxplot()+
       labs(title = "Best Standard Well's compared to their parent's")
